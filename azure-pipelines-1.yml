@@ -1,0 +1,56 @@
+# ASP.NET Core (.NET Framework)
+# Build and test ASP.NET Core projects targeting the full .NET Framework.
+# Add steps that publish symbols, save build artifacts, and more:
+# https://docs.microsoft.com/azure/devops/pipelines/languages/dotnet-core
+
+trigger:
+- main
+
+pool:
+  name: 'Default'  # Use your self-hosted agent
+
+variables:
+  buildConfiguration: 'Release'
+
+steps:
+# ✅ Install .NET SDK (ensure your agent has it installed)
+- task: UseDotNet@2
+  inputs:
+    packageType: 'sdk'
+    version: '7.0.x'
+    installationPath: $(Agent.ToolsDirectory)/dotnet
+
+# ✅ SonarQube: Prepare Analysis Configuration
+- task: SonarQubePrepare@5
+  inputs:
+    SonarQube: 'SonarQube-Local'  # 🔁 Your service connection name
+    scannerMode: 'MSBuild'
+    projectKey: 'mvc_app'
+    projectName: 'MVC Web App'
+
+# ✅ Build the Project
+- script: dotnet build --configuration $(buildConfiguration)
+  displayName: 'Build the project'
+
+# ✅ Optional: Run Tests (Required if you want coverage in SonarQube)
+# - script: dotnet test --configuration $(buildConfiguration) --collect:"XPlat Code Coverage"
+#   displayName: 'Run Tests and Collect Coverage'
+
+# ✅ SonarQube: Run Analysis
+- task: SonarQubeAnalyze@5
+
+# ✅ SonarQube: Publish Results
+- task: SonarQubePublish@5
+  inputs:
+    pollingTimeoutSec: '300'
+
+# ✅ Publish the Project (for deployment)
+- script: dotnet publish -c $(buildConfiguration) -o $(Build.ArtifactStagingDirectory)
+  displayName: 'Publish the project'
+
+# ✅ Publish Build Artifacts
+- task: PublishBuildArtifacts@1
+  inputs:
+    PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+    ArtifactName: 'mvc_app'
+    publishLocation: 'Container'
