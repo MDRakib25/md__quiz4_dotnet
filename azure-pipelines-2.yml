@@ -13,37 +13,37 @@ variables:
   buildConfiguration: 'Release'
 
 steps:
-# ✅ Install .NET SDK
 - task: UseDotNet@2
   inputs:
     packageType: 'sdk'
     version: '7.0.x'
     installationPath: $(Agent.ToolsDirectory)/dotnet
 
-# ✅ Prepare SonarQube Analysis (disable branch + code coverage)
+# ✅ SonarQube Prepare (disable branch name properly)
 - task: SonarQubePrepare@5
   inputs:
-    SonarQube: 'SonarQube-Local'  # Your service connection name
+    SonarQube: 'SonarQube-Local'
     scannerMode: 'MSBuild'
     projectKey: 'MyAppKey'
     projectName: 'MyAppName'
     extraProperties: |
-      sonar.branch.name=
+      # Disables automatic branch analysis for Community Edition
+      sonar.branch.name=none
       sonar.cs.vscoveragexml.reportsPaths=
 
-# ✅ Build the Project
+# ✅ Build
 - script: dotnet build --configuration $(buildConfiguration)
   displayName: 'Build the project'
 
-# ✅ Run SonarQube Analysis
+# ✅ Analyze
 - task: SonarQubeAnalyze@5
 
-# ✅ Publish SonarQube Results
+# ✅ Publish Results
 - task: SonarQubePublish@5
   inputs:
     pollingTimeoutSec: '300'
 
-# ✅ Publish the App for Deployment
+# ✅ Publish the App
 - script: dotnet publish -c $(buildConfiguration) -o $(Build.ArtifactStagingDirectory)
   displayName: 'Publish the project'
 
