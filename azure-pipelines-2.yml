@@ -20,7 +20,7 @@ steps:
     version: '7.0.x'
     installationPath: $(Agent.ToolsDirectory)/dotnet
 
-# ✅ Prepare SonarQube Analysis
+# ✅ Prepare SonarQube Analysis (disable branch + code coverage)
 - task: SonarQubePrepare@5
   inputs:
     SonarQube: 'SonarQube-Local'  # Your service connection name
@@ -28,7 +28,8 @@ steps:
     projectKey: 'MyAppKey'
     projectName: 'MyAppName'
     extraProperties: |
-      sonar.branch.name=  # 👈 Prevents Community Edition branch error
+      sonar.branch.name=
+      sonar.cs.vscoveragexml.reportsPaths=
 
 # ✅ Build the Project
 - script: dotnet build --configuration $(buildConfiguration)
@@ -52,4 +53,3 @@ steps:
     PathtoPublish: '$(Build.ArtifactStagingDirectory)'
     ArtifactName: 'mvc_app'
     publishLocation: 'Container'
-
