@@ -1,80 +1,62 @@
-# ASP.NET Core (.NET Framework)
-# Build and test ASP.NET Core projects targeting the full .NET Framework.
-# Add steps that publish symbols, save build artifacts, and more:
-# https://docs.microsoft.com/azure/devops/pipelines/languages/dotnet-core
-
-# ASP.NET Core (.NET Framework) with SonarQube and Unit Tests
+# ASP.NET Core with SonarQube (Docker) Analysis
 trigger:
 - main
 
-pool:
-  name: 'Default'  # Use your self-hosted agent
-
 variables:
   buildConfiguration: 'Release'
-  sonarProjectKey: 'squ_e0be4f7441fa1e6bd96aa1f186cdf355e186a2c6'  # Replace with your SonarQube project key
-  sonarProjectName: 'md__quiz4_agile'  # Replace with your project name
-  sonarHostUrl: 'http://localhost:9000'  # Replace with your SonarQube server URL
+  sonarProjectKey: 'mvc_app'  # Lowercase, no spaces
+  sonarProjectName: 'MVC Application'
+  sonarHostUrl: 'http://localhost:9000'  # Or your Docker host IP
+  sonarToken: $(SONARQUBE_TOKEN)  # Store this in pipeline variables
   dotnetSdkVersion: '7.0.x'
 
-steps:
-# Prepare SonarQube credentials
-- task: SonarQubePrepare@4
-  inputs:
-    SonarQube: 'SonarQubeServiceConnection'  # Create this service connection in Azure DevOps
-    scannerMode: 'MSBuild'
-    projectKey: '$(sonarProjectKey)'
-    projectName: '$(sonarProjectName)'
-    projectVersion: '1.0.$(Build.BuildId)'
-    extraProperties: |
-      sonar.cs.opencover.reportsPaths=$(Build.SourcesDirectory)/**/coverage.opencover.xml
-      sonar.exclusions=**/wwwroot/**, **/*.css, **/*.html, **/*.js
+pool:
+  name: 'Default'
 
+steps:
 # Install .NET SDK
 - task: UseDotNet@2
   inputs:
     packageType: 'sdk'
     version: '$(dotnetSdkVersion)'
-    installationPath: $(Agent.ToolsDirectory)/dotnet
 
-# Restore NuGet packages
-- script: dotnet restore
-  displayName: 'Restore NuGet packages'
-
-# Build the solution with SonarQube
-- script: dotnet build --configuration $(buildConfiguration)
-  displayName: 'Build the solution'
-
-# Run unit tests with code coverage
+# Install SonarScanner for .NET
 - script: |
-    dotnet test --configuration $(buildConfiguration) --logger trx --results-directory $(Build.SourcesDirectory)/TestResults /p:CollectCoverage=true /p:CoverletOutputFormat=opencover /p:CoverletOutput=$(Build.SourcesDirectory)/TestResults/coverage/
-  displayName: 'Run unit tests with coverage'
+    dotnet tool install --global dotnet-sonarscanner
+  displayName: 'Install SonarScanner'
 
-# Publish test results
+# Authenticate with SonarQube
+- script: |
+    dotnet sonarscanner begin /k:"$(sonarProjectKey)" /n:"$(sonarProjectName)" /d:sonar.host.url="$(sonarHostUrl)" /d:sonar.login="$(sonarToken)" /d:sonar.cs.opencover.reportsPaths="**/coverage.opencover.xml" /d:sonar.exclusions="**/wwwroot/**, **/*.css, **/*.html, **/*.js"
+  displayName: 'SonarQube: Begin Analysis'
+
+# Build and test
+- script: dotnet restore
+  displayName: 'Restore packages'
+
+- script: dotnet build --configuration $(buildConfiguration)
+  displayName: 'Build solution'
+
+- script: |
+    dotnet test --configuration $(buildConfiguration) --logger trx --results-directory TestResults /p:CollectCoverage=true /p:CoverletOutputFormat=opencover /p:CoverletOutput=TestResults/coverage/
+  displayName: 'Run tests with coverage'
+
+# Complete SonarQube analysis
+- script: |
+    dotnet sonarscanner end /d:sonar.login="$(sonarToken)"
+  displayName: 'SonarQube: End Analysis'
+
+# Publish results
 - task: PublishTestResults@2
   inputs:
     testRunner: 'VSTest'
     testResultsFiles: '**/*.trx'
-    searchFolder: '$(Build.SourcesDirectory)/TestResults'
-    mergeTestResults: true
-    failTaskOnFailedTests: true
 
-# Complete SonarQube analysis
-- task: SonarQubeAnalyze@4
-  displayName: 'Run SonarQube Analysis'
-
-# Publish SonarQube results
-- task: SonarQubePublish@4
-  inputs:
-    pollingTimeoutSec: '300'
-
-# Publish the application
+# Publish artifacts
 - script: dotnet publish -c $(buildConfiguration) -o $(Build.ArtifactStagingDirectory)
-  displayName: 'Publish the project'
+  displayName: 'Publish application'
 
-# Publish build artifacts
 - task: PublishBuildArtifacts@1
   inputs:
     PathtoPublish: '$(Build.ArtifactStagingDirectory)'
     ArtifactName: 'mvc_app'
-    publishLocation: 'Container'
