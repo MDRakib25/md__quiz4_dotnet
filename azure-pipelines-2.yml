@@ -13,39 +13,43 @@ variables:
   buildConfiguration: 'Release'
 
 steps:
+# ✅ Install .NET SDK
 - task: UseDotNet@2
   inputs:
     packageType: 'sdk'
     version: '7.0.x'
     installationPath: $(Agent.ToolsDirectory)/dotnet
 
-# ✅ Prepare SonarQube
+# ✅ Prepare SonarQube Analysis
 - task: SonarQubePrepare@5
   inputs:
-    SonarQube: 'SonarQube-Local'  # Same as your connection name
+    SonarQube: 'SonarQube-Local'  # Your service connection name
     scannerMode: 'MSBuild'
     projectKey: 'MyAppKey'
     projectName: 'MyAppName'
+    extraProperties: |
+      sonar.branch.name=  # 👈 Prevents Community Edition branch error
 
-# ✅ Build
+# ✅ Build the Project
 - script: dotnet build --configuration $(buildConfiguration)
   displayName: 'Build the project'
 
-# ✅ Analyze with SonarQube
+# ✅ Run SonarQube Analysis
 - task: SonarQubeAnalyze@5
 
-# ✅ Publish Results
+# ✅ Publish SonarQube Results
 - task: SonarQubePublish@5
   inputs:
     pollingTimeoutSec: '300'
 
-# ✅ Publish the app
+# ✅ Publish the App for Deployment
 - script: dotnet publish -c $(buildConfiguration) -o $(Build.ArtifactStagingDirectory)
   displayName: 'Publish the project'
 
-# ✅ Upload build artifact
+# ✅ Upload Build Artifacts
 - task: PublishBuildArtifacts@1
   inputs:
     PathtoPublish: '$(Build.ArtifactStagingDirectory)'
     ArtifactName: 'mvc_app'
     publishLocation: 'Container'
+
